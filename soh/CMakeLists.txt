@@ -764,8 +764,8 @@ elseif(CMAKE_SYSTEM_NAME MATCHES "CafeOS")
 wut_create_rpx(${PROJECT_NAME})
 
 wut_create_wuhb(${PROJECT_NAME}
-    NAME       "Ship of Harkinian"
-    SHORTNAME  "SoH"
+    NAME       "Ship of Harkinian 9.2 (Experimental)"
+    SHORTNAME  "SoH 9.2 Wii U"
     AUTHOR     "${PROJECT_TEAM}"
     ICON       ${CMAKE_CURRENT_SOURCE_DIR}/icon.jpg
 )

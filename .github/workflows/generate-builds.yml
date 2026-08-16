@@ -264,6 +264,47 @@ jobs:
         key: ${{ steps.restore-cache-deps.outputs.cache-primary-key }}
         path: deps
 
+  build-wiiu:
+    needs: generate-soh-otr
+    runs-on: ubuntu-22.04
+    container:
+      image: devkitpro/devkitppc:20260503
+    steps:
+    - name: Install dependencies
+      run: |
+        apt-get update
+        apt-get install -y ninja-build
+    - name: Git Checkout
+      uses: actions/checkout@v6
+      with:
+        submodules: true
+    - name: Download soh.o2r
+      uses: actions/download-artifact@v7
+      with:
+        name: soh.o2r
+        path: build-wiiu/soh
+    - name: Build SoH for Wii U
+      env:
+        DEVKITPRO: /opt/devkitpro
+        DEVKITPPC: /opt/devkitpro/devkitPPC
+      run: |
+        cmake -S . -B build-wiiu -G Ninja \
+          -DCMAKE_TOOLCHAIN_FILE=/opt/devkitpro/cmake/WiiU.cmake \
+          -DCMAKE_BUILD_TYPE=Release
+        cmake --build build-wiiu --target soh_wuhb --parallel 3
+    - name: Assemble SD-card package
+      run: |
+        mkdir -p dist/soh-9-2-wiiu
+        cp build-wiiu/soh/soh.rpx dist/soh-9-2-wiiu/
+        cp build-wiiu/soh/soh.wuhb dist/soh-9-2-wiiu/
+        cp build-wiiu/soh/soh.o2r dist/soh-9-2-wiiu/
+        cp README_WIIU_TESTING.md dist/
+    - name: Upload Wii U build
+      uses: actions/upload-artifact@v7
+      with:
+        name: soh-wiiu-9.2.3-experimental
+        path: dist
+
   build-windows:
     needs: generate-soh-otr
     runs-on: windows-latest
