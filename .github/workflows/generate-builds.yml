@@ -303,11 +303,19 @@ jobs:
     - name: Install dependencies
       run: |
         apt-get update
-        apt-get install -y ninja-build
+        apt-get install -y ccache ninja-build
     - name: Git Checkout
       uses: actions/checkout@v6
       with:
         submodules: true
+    - name: Restore Wii U compiler cache
+      id: restore-wiiu-ccache
+      uses: actions/cache/restore@v5
+      with:
+        path: .ccache
+        key: ${{ runner.os }}-wiiu-ccache-${{ github.sha }}
+        restore-keys: |
+          ${{ runner.os }}-wiiu-ccache-
     - name: Download soh.o2r
       uses: actions/download-artifact@v7
       with:
@@ -317,12 +325,27 @@ jobs:
       env:
         DEVKITPRO: /opt/devkitpro
         DEVKITPPC: /opt/devkitpro/devkitPPC
+        CCACHE_DIR: ${{ github.workspace }}/.ccache
+        CCACHE_MAXSIZE: 1G
       run: |
         git config --global --add safe.directory "$GITHUB_WORKSPACE"
         cmake -S . -B build-wiiu -G Ninja \
           -DCMAKE_TOOLCHAIN_FILE=/opt/devkitpro/cmake/WiiU.cmake \
-          -DCMAKE_BUILD_TYPE=Release
+          -DCMAKE_BUILD_TYPE=Release \
+          -DCMAKE_C_COMPILER_LAUNCHER=ccache \
+          -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
         cmake --build build-wiiu --target soh_wuhb --parallel 3
+    - name: Show Wii U compiler cache statistics
+      if: ${{ always() }}
+      env:
+        CCACHE_DIR: ${{ github.workspace }}/.ccache
+      run: ccache --show-stats
+    - name: Save Wii U compiler cache
+      if: ${{ always() }}
+      uses: actions/cache/save@v5
+      with:
+        path: .ccache
+        key: ${{ steps.restore-wiiu-ccache.outputs.cache-primary-key }}
     - name: Assemble SD-card package
       run: |
         mkdir -p dist/soh-9-2-wiiu
