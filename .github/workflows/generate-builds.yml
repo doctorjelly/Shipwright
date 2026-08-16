@@ -288,6 +288,7 @@ jobs:
         DEVKITPRO: /opt/devkitpro
         DEVKITPPC: /opt/devkitpro/devkitPPC
       run: |
+        git config --global --add safe.directory "$GITHUB_WORKSPACE"
         cmake -S . -B build-wiiu -G Ninja \
           -DCMAKE_TOOLCHAIN_FILE=/opt/devkitpro/cmake/WiiU.cmake \
           -DCMAKE_BUILD_TYPE=Release
