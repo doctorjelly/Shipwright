@@ -1,4 +1,12 @@
 #include "colViewer.h"
+
+// BSD-derived platforms expose `quad` as a macro for `quad_t`. libultraship
+// includes the platform headers before z64.h in this translation unit, so
+// remove the macro before ColliderQuadDim declares its `quad` member.
+#ifdef quad
+#undef quad
+#endif
+
 #include "soh/SohGui/UIWidgets.hpp"
 #include "soh/SohGui/SohGui.hpp"
 
