@@ -29,6 +29,10 @@
 extern "C" SaveContext gSaveContext;
 using namespace std::string_literals;
 
+#if defined(__WIIU__) || defined(__SWITCH__)
+static int copy_file(const char* src, const char* dst);
+#endif
+
 void SaveManager::WriteSaveFile(const std::filesystem::path& savePath, const uintptr_t addr, void* dramAddr,
                                 const size_t size) {
     std::ofstream saveFile = std::ofstream(savePath, std::fstream::in | std::fstream::out | std::fstream::binary);
@@ -513,7 +517,12 @@ void SaveManager::StartupCheckAndInitMeta(int fileNum) {
                 Ship::Context::GetPathRelativeToAppDirectory("Save") +
                 ("/file" + std::to_string(fileNum + 1) + "-" + std::to_string(GetUnixTimestamp()) + ".bak");
 #if defined(__SWITCH__) || defined(__WIIU__)
-            copy_file(fileName.c_str(), newFileName.c_str());
+            if (copy_file(fileName.c_str(), newFileName.c_str()) != 0) {
+                SPDLOG_ERROR("Could not back up outdated randomizer save {}", fileName.string());
+                SohGui::RegisterPopup("Outdated Randomizer Save",
+                                      "The outdated save could not be backed up, so it was left unchanged.");
+                return;
+            }
             std::filesystem::remove(fileName);
 #else
             std::filesystem::rename(fileName, newFileName);
@@ -1101,27 +1110,42 @@ void SaveManager::InitFileMaxed() {
 
 #if defined(__WIIU__) || defined(__SWITCH__)
 // std::filesystem::copy_file doesn't work properly with the Wii U's toolchain atm
-int copy_file(const char* src, const char* dst) {
+static int copy_file(const char* src, const char* dst) {
     alignas(0x40) uint8_t buf[4096];
-    FILE* r = fopen(src, "r");
+    FILE* r = fopen(src, "rb");
     if (!r) {
         return -1;
     }
-    FILE* w = fopen(dst, "w");
+    FILE* w = fopen(dst, "wb");
     if (!w) {
+        fclose(r);
         return -2;
     }
 
-    size_t res;
+    int result = 0;
+    size_t res = 0;
     while ((res = fread(buf, 1, sizeof(buf), r)) > 0) {
         if (fwrite(buf, 1, res, w) != res) {
+            result = -3;
             break;
         }
     }
 
+    if (ferror(r)) {
+        result = -4;
+    }
+    if (fflush(w) != 0 && result == 0) {
+        result = -5;
+    }
+
     fclose(r);
-    fclose(w);
-    return res >= 0 ? 0 : res;
+    if (fclose(w) != 0 && result == 0) {
+        result = -6;
+    }
+    if (result != 0) {
+        remove(dst);
+    }
+    return result;
 }
 #endif
 
@@ -1178,10 +1202,17 @@ void SaveManager::SaveFileThreaded(int fileNum, SaveContext* saveContext, int se
     }
 
 #if defined(__SWITCH__) || defined(__WIIU__)
-    FILE* w = fopen(tempFile.c_str(), "w");
+    FILE* w = fopen(tempFile.c_str(), "wb");
     std::string json_string = saveBlock.dump(1);
-    fwrite(json_string.c_str(), sizeof(char), json_string.length(), w);
-    fclose(w);
+    size_t written = w ? fwrite(json_string.c_str(), sizeof(char), json_string.length(), w) : 0;
+    int closeResult = w ? fclose(w) : -1;
+    if (written != json_string.length() || closeResult != 0) {
+        remove(tempFile.c_str());
+        SPDLOG_ERROR("Could not write temporary save file {}", tempFile.string());
+        delete saveContext;
+        saveMtx.unlock();
+        return;
+    }
 #else
     std::ofstream output(tempFile);
     output << std::setw(1) << saveBlock << std::endl;
@@ -1189,12 +1220,35 @@ void SaveManager::SaveFileThreaded(int fileNum, SaveContext* saveContext, int se
 #endif
 
 #if defined(__SWITCH__) || defined(__WIIU__)
+    std::filesystem::path backupFile = fileName.string() + ".previous";
+    bool backedUpPreviousSave = false;
     if (std::filesystem::exists(fileName)) {
-        std::filesystem::remove(fileName);
+        if (std::filesystem::exists(backupFile)) {
+            std::filesystem::remove(backupFile);
+        }
+        if (copy_file(fileName.c_str(), backupFile.c_str()) != 0) {
+            SPDLOG_ERROR("Could not back up existing save file {}", fileName.string());
+            delete saveContext;
+            saveMtx.unlock();
+            return;
+        }
+        backedUpPreviousSave = true;
     }
-    copy_file(tempFile.c_str(), fileName.c_str());
+    if (copy_file(tempFile.c_str(), fileName.c_str()) != 0) {
+        SPDLOG_ERROR("Could not replace save file {}; temporary save retained at {}", fileName.string(),
+                     tempFile.string());
+        if (backedUpPreviousSave && copy_file(backupFile.c_str(), fileName.c_str()) != 0) {
+            SPDLOG_ERROR("Could not restore previous save file; recovery copy retained at {}", backupFile.string());
+        }
+        delete saveContext;
+        saveMtx.unlock();
+        return;
+    }
     if (std::filesystem::exists(tempFile)) {
         std::filesystem::remove(tempFile);
+    }
+    if (backedUpPreviousSave && std::filesystem::exists(backupFile)) {
+        std::filesystem::remove(backupFile);
     }
 #else
     std::filesystem::rename(tempFile, fileName);
@@ -1313,15 +1367,20 @@ void SaveManager::LoadFile(int fileNum) {
             Ship::Context::GetPathRelativeToAppDirectory("Save") +
             ("/file" + std::to_string(fileNum + 1) + "-" + std::to_string(GetUnixTimestamp()) + ".bak");
 #if defined(__SWITCH__) || defined(__WIIU__)
-        copy_file(fileName.c_str(), newFileName.c_str());
-        std::filesystem::remove(fileName);
+        bool backupSucceeded = copy_file(fileName.c_str(), newFileName.c_str()) == 0;
+        if (backupSucceeded) {
+            std::filesystem::remove(fileName);
+        }
 #else
         std::filesystem::rename(fileName, newFileName);
+        bool backupSucceeded = true;
 #endif
-        SohGui::RegisterPopup("Error loading save file", "A problem occurred loading the save in slot " +
-                                                             std::to_string(fileNum + 1) +
-                                                             ".\nSave file corruption is suspected.\n" +
-                                                             "The file has been renamed to prevent further issues.");
+        SohGui::RegisterPopup(
+            "Error loading save file",
+            "A problem occurred loading the save in slot " + std::to_string(fileNum + 1) +
+                ".\nSave file corruption is suspected.\n" +
+                (backupSucceeded ? "The file has been renamed to prevent further issues."
+                                 : "The file could not be backed up, so it was left unchanged."));
     }
     saveMtx.unlock();
 }
@@ -2400,7 +2459,10 @@ void SaveManager::CopyZeldaFile(int from, int to) {
     assert(std::filesystem::exists(GetFileName(from)));
     DeleteZeldaFile(to);
 #if defined(__WIIU__) || defined(__SWITCH__)
-    copy_file(GetFileName(from).c_str(), GetFileName(to).c_str());
+    if (copy_file(GetFileName(from).c_str(), GetFileName(to).c_str()) != 0) {
+        SPDLOG_ERROR("Could not copy save slot {} to slot {}", from + 1, to + 1);
+        return;
+    }
 #else
     std::filesystem::copy_file(GetFileName(from), GetFileName(to));
 #endif

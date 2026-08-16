@@ -20,19 +20,8 @@ jobs:
       with:
         key: ${{ runner.os }}-soh-o2r-9.2.3
         path: soh.o2r
-    - name: Bootstrap soh.o2r cache for Wii U bring-up
-      id: bootstrap-soh-otr
-      if: steps.restore-soh-otr.outputs.cache-hit != 'true'
-      continue-on-error: true
-      uses: actions/download-artifact@v7
-      with:
-        name: soh.o2r
-        path: .
-        repository: doctorjelly/Shipwright
-        run-id: 31957641303
-        github-token: ${{ secrets.GITHUB_TOKEN }}
     - name: Configure ccache
-      if: steps.restore-soh-otr.outputs.cache-hit != 'true' && steps.bootstrap-soh-otr.outcome != 'success'
+      if: steps.restore-soh-otr.outputs.cache-hit != 'true'
       uses: hendrikmuhs/ccache-action@v1.2
       with:
         save: ${{ github.ref_name == github.event.repository.default_branch }}
@@ -41,12 +30,12 @@ jobs:
           ${{ runner.os }}-otr-ccache-${{ github.ref }}
           ${{ runner.os }}-otr-ccache
     - name: Install dependencies
-      if: steps.restore-soh-otr.outputs.cache-hit != 'true' && steps.bootstrap-soh-otr.outcome != 'success'
+      if: steps.restore-soh-otr.outputs.cache-hit != 'true'
       run: |
         sudo apt-get update
         sudo apt-get install -y $(cat .github/workflows/apt-deps.txt) libzip-dev zipcmp zipmerge ziptool
     - name: Restore Cached deps folder
-      if: steps.restore-soh-otr.outputs.cache-hit != 'true' && steps.bootstrap-soh-otr.outcome != 'success'
+      if: steps.restore-soh-otr.outputs.cache-hit != 'true'
       uses: actions/cache/restore@v5
       with:
         key: ${{ runner.os }}-deps-${{ github.ref }}-${{ github.sha }}
@@ -55,10 +44,10 @@ jobs:
           ${{ runner.os }}-deps-
         path: deps
     - name: Create deps folder
-      if: steps.restore-soh-otr.outputs.cache-hit != 'true' && steps.bootstrap-soh-otr.outcome != 'success'
+      if: steps.restore-soh-otr.outputs.cache-hit != 'true'
       run: mkdir -p deps
     - name: Install latest SDL
-      if: steps.restore-soh-otr.outputs.cache-hit != 'true' && steps.bootstrap-soh-otr.outcome != 'success'
+      if: steps.restore-soh-otr.outputs.cache-hit != 'true'
       run: |
         export PATH="/usr/lib/ccache:/usr/local/opt/ccache/libexec:$PATH"
         if [ ! -d "deps/SDL2-2.30.3" ]; then
@@ -71,7 +60,7 @@ jobs:
         sudo make install
         sudo cp -av /usr/local/lib/libSDL* /lib/x86_64-linux-gnu/
     - name: Install latest tinyxml2
-      if: steps.restore-soh-otr.outputs.cache-hit != 'true' && steps.bootstrap-soh-otr.outcome != 'success'
+      if: steps.restore-soh-otr.outputs.cache-hit != 'true'
       run: |
         sudo apt-get remove libtinyxml2-dev
         export PATH="/usr/lib/ccache:/usr/local/opt/ccache/libexec:$PATH"
@@ -86,7 +75,7 @@ jobs:
         make
         sudo make install
     - name: Generate soh.o2r
-      if: steps.restore-soh-otr.outputs.cache-hit != 'true' && steps.bootstrap-soh-otr.outcome != 'success'
+      if: steps.restore-soh-otr.outputs.cache-hit != 'true'
       run: |
         export PATH="/usr/lib/ccache:/usr/local/opt/ccache/libexec:$PATH"
         cmake --no-warn-unused-cli -H. -Bbuild-cmake -GNinja -DCMAKE_BUILD_TYPE:STRING=Release
@@ -334,7 +323,7 @@ jobs:
           -DCMAKE_BUILD_TYPE=Release \
           -DCMAKE_C_COMPILER_LAUNCHER=ccache \
           -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
-        cmake --build build-wiiu --target soh_wuhb --parallel 3
+        cmake --build build-wiiu --target soh_wuhb --parallel 3 -- -k 0
     - name: Show Wii U compiler cache statistics
       if: ${{ always() }}
       env:

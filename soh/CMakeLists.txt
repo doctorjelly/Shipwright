@@ -162,7 +162,10 @@ if (NOT ESPEAK)
 endif()
 
 # soh/Extractor {{{
-list(FILTER ship__ EXCLUDE REGEX "soh/Extractor/*")
+# `soh__` is a recursive glob and already contains the extractor sources. Remove
+# them before adding the platform-specific list below; consoles only carry the
+# headers because ROM extraction is a desktop-only feature.
+list(FILTER soh__ EXCLUDE REGEX "^soh/Extractor/")
 
 if(NOT CMAKE_SYSTEM_NAME MATCHES "NintendoSwitch|CafeOS")
     file(GLOB_RECURSE soh__Extractor RELATIVE ${CMAKE_CURRENT_SOURCE_DIR}
@@ -764,8 +767,8 @@ elseif(CMAKE_SYSTEM_NAME MATCHES "CafeOS")
 wut_create_rpx(${PROJECT_NAME})
 
 wut_create_wuhb(${PROJECT_NAME}
-    NAME       "Ship of Harkinian 9.2 (Experimental)"
-    SHORTNAME  "SoH 9.2 Wii U"
+    NAME       "Ship of Harkinian 9.2.3 (Experimental)"
+    SHORTNAME  "SoH 9.2.3 Wii U"
     AUTHOR     "${PROJECT_TEAM}"
     ICON       ${CMAKE_CURRENT_SOURCE_DIR}/icon.jpg
 )

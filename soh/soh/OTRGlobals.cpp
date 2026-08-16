@@ -406,7 +406,9 @@ void OTRGlobals::RunExtract(int argc, char* argv[]) {
             args.push_back(argv[i]);
         }
     }
+#if !defined(__SWITCH__) && !defined(__WIIU__)
     Extractor extract;
+#endif
     PromptSteps promptStep = PS_FILE_CHECK;
     bool generatedIsMQ = false;
     std::atomic<size_t> extractCount = 0, totalExtract = 0;
@@ -416,20 +418,22 @@ void OTRGlobals::RunExtract(int argc, char* argv[]) {
     std::string file;
 
 #if defined(__SWITCH__)
-    SohGui::RegisterPopup("Outdated ROM Archives",
-                          "\x1b[2;2HYou've launched the Ship with an old ROM O2R file."
-                          "\x1b[4;2HPlease regenerate a new ROM O2R and relaunch."
-                          "\x1b[6;2HPress the Home button to exit...",
-                          "OK", "", [&]() { exit(1); });
+    if (shouldRegen) {
+        SohGui::RegisterPopup("Outdated ROM Archives",
+                              "\x1b[2;2HYou've launched the Ship with an old ROM O2R file."
+                              "\x1b[4;2HPlease regenerate a new ROM O2R and relaunch."
+                              "\x1b[6;2HPress the Home button to exit...",
+                              "OK", "", [&]() { exit(1); });
+    }
 #elif defined(__WIIU__)
-    SohGui::RegisterPopup("Outdated ROM Archives",
-                          "You've launched the Ship with an old a ROM O2R file.\n\n"
-                          "Please generate a ROM O2R and relaunch.\n\n"
-                          "Press and hold the Power button to shutdown...",
-                          "OK", "", [&]() { exit(1); });
-    OSFatal();
-#endif
-
+    if (shouldRegen) {
+        SohGui::RegisterPopup("Outdated ROM Archives",
+                              "You've launched the Ship with an old ROM O2R file.\n\n"
+                              "Please generate a new ROM O2R on a computer and relaunch.\n\n"
+                              "Press OK to exit.",
+                              "OK", "", [&]() { exit(1); });
+    }
+#else
     if (!std::filesystem::exists(installPath + "/assets")) {
         SohGui::RegisterPopup("Extractor assets not found",
                               "No O2R files found. Missing 'assets/' folder needed to generate OTR file.\nPlease "
@@ -442,8 +446,11 @@ void OTRGlobals::RunExtract(int argc, char* argv[]) {
         std::filesystem::remove("oot.o2r");
         std::filesystem::remove("oot-mq.o2r");
     }
+#endif
 
+#if !defined(__SWITCH__) && !defined(__WIIU__)
     std::shared_ptr<BS::thread_pool> threadPool = std::make_shared<BS::thread_pool>(1);
+#endif
     std::optional<std::future<void>> extractionTask;
 
 #if not defined(__SWITCH__) && not defined(__WIIU__)
@@ -608,6 +615,7 @@ void OTRGlobals::RunExtract(int argc, char* argv[]) {
                 break;
             }
             case ES_EXTRACT: {
+#if !defined(__SWITCH__) && !defined(__WIIU__)
                 switch (promptStep) {
                     case PS_FILE_CHECK: {
                         const bool ootO2RExists =
@@ -679,6 +687,9 @@ void OTRGlobals::RunExtract(int argc, char* argv[]) {
                     default:
                         break;
                 }
+#else
+                extractStep = ES_VERIFY;
+#endif
                 break;
             }
             case ES_VERIFY: {
@@ -758,8 +769,6 @@ void OTRGlobals::RunExtract(int argc, char* argv[]) {
 
 #ifdef __SWITCH__
     Ship::Switch::Init(Ship::PreInitPhase);
-#elif defined(__WIIU__)
-    Ship::WiiU::Init(appShortName);
 #endif
 }
 
@@ -1445,7 +1454,13 @@ OTRVersion DetectOTRVersion(std::string fileName, bool isMQ) {
 }
 
 extern "C" void Messagebox_ShowErrorBox(char* title, char* body) {
+#if defined(__WIIU__)
+    OSFatal(body);
+#elif defined(__SWITCH__)
+    SohGui::RegisterPopup(title, body, "OK", "", []() {});
+#else
     Extractor::ShowErrorBox(title, body);
+#endif
 }
 
 bool VerifyArchiveVersion(OTRVersion version) {
@@ -1453,6 +1468,12 @@ bool VerifyArchiveVersion(OTRVersion version) {
 }
 
 extern "C" void InitOTR(int argc, char* argv[]) {
+#ifdef __WIIU__
+    // Establish the isolated SD-card working directory before the context looks
+    // for archives, configuration, logs, or save data.
+    Ship::WiiU::Init(appShortName);
+#endif
+
     OTRGlobals::Instance = new OTRGlobals();
     OTRGlobals::Instance->RunExtract(argc, argv);
 

@@ -1,6 +1,13 @@
 #ifndef Z_COLLISION_CHECK_H
 #define Z_COLLISION_CHECK_H
 
+// BSD-derived system headers expose `quad` as a macro for `quad_t`. It can be
+// pulled in before this header on Wii U and macOS, where it would rewrite the
+// ColliderQuadDim member name below.
+#ifdef quad
+#undef quad
+#endif
+
 #define COLLISION_CHECK_AT_MAX 50
 #define COLLISION_CHECK_AC_MAX 60
 #define COLLISION_CHECK_OC_MAX 50

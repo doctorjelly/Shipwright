@@ -16,7 +16,7 @@ The experimental build deliberately uses `sd:/wiiu/apps/soh-9-2-wiiu/` for its c
 
 Use the Release artifact only. Then test in this order:
 
-1. Launch from the Homebrew Launcher and confirm the title says `Ship of Harkinian 9.2 (Experimental)`.
+1. Launch from the Homebrew Launcher and confirm the title says `Ship of Harkinian 9.2.3 (Experimental)`.
 2. Reach the file-select screen without copying an old save into the experimental directory.
 3. Create a temporary save, enter Kokiri Forest, pause, and save normally.
 4. Return to the Wii U Menu using the HOME button, then relaunch and verify the temporary save.
