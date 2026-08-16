@@ -684,12 +684,25 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "NintendoSwitch")
     )
 elseif(CMAKE_SYSTEM_NAME STREQUAL "CafeOS")
     find_package(SDL2 REQUIRED)
+    # Streamed custom audio is compiled on Wii U as well. Use the package
+    # targets so opusfile supplies its non-default include directory and both
+    # decoders carry their static codec/container dependencies to the linker.
+    find_package(Ogg REQUIRED)
+    find_package(Vorbis REQUIRED)
+    find_package(Opus REQUIRED)
+    find_package(OpusFile REQUIRED)
+    find_library(MATH_LIBRARY m)
     set(ADDITIONAL_LIBRARY_DEPENDENCIES
         "libultraship;"
         SDL2::SDL2-static
+        Vorbis::vorbisfile
+        Opusfile::Opusfile
 
         "$<$<CONFIG:Debug>:-Wl,--wrap=abort>"
     )
+    if(MATH_LIBRARY)
+        list(APPEND ADDITIONAL_LIBRARY_DEPENDENCIES ${MATH_LIBRARY})
+    endif()
     target_include_directories(${PROJECT_NAME} PRIVATE
         ${DEVKITPRO}/portlibs/wiiu/include/
     )
