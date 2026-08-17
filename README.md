@@ -1,6 +1,9 @@
 ![Ship of Harkinian](docs/shiptitle.darkmode.png#gh-dark-mode-only)
 ![Ship of Harkinian](docs/shiptitle.lightmode.png#gh-light-mode-only)
 
+> [!IMPORTANT]
+> This branch contains an experimental Ship of Harkinian 9.2.3 port for Wii U. See the [first-time installation and hardware-testing guide](README_WIIU_TESTING.md) before copying it to an SD card.
+
 ## Website
 
 Official Website: https://www.shipofharkinian.com/

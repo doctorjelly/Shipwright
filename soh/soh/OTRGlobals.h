@@ -35,7 +35,12 @@ struct ExtensionEntry {
 extern std::unordered_map<std::string, ExtensionEntry> ExtensionCache;
 #include "Enhancements/randomizer/settings.h"
 
-const std::string appShortName = "soh";
+#ifdef __WIIU__
+// Keep the experimental 9.2.x port isolated from the stable Wii U release.
+inline const std::string appShortName = "soh-9-2-wiiu";
+#else
+inline const std::string appShortName = "soh";
+#endif
 
 #ifdef __WIIU__
 const uint32_t defaultImGuiScale = 3;

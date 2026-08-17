@@ -14,7 +14,14 @@ jobs:
       uses: actions/checkout@v6
       with:
         submodules: true
+    - name: Restore cached soh.o2r
+      id: restore-soh-otr
+      uses: actions/cache/restore@v5
+      with:
+        key: ${{ runner.os }}-soh-o2r-9.2.3
+        path: soh.o2r
     - name: Configure ccache
+      if: steps.restore-soh-otr.outputs.cache-hit != 'true'
       uses: hendrikmuhs/ccache-action@v1.2
       with:
         save: ${{ github.ref_name == github.event.repository.default_branch }}
@@ -23,10 +30,12 @@ jobs:
           ${{ runner.os }}-otr-ccache-${{ github.ref }}
           ${{ runner.os }}-otr-ccache
     - name: Install dependencies
+      if: steps.restore-soh-otr.outputs.cache-hit != 'true'
       run: |
         sudo apt-get update
         sudo apt-get install -y $(cat .github/workflows/apt-deps.txt) libzip-dev zipcmp zipmerge ziptool
     - name: Restore Cached deps folder
+      if: steps.restore-soh-otr.outputs.cache-hit != 'true'
       uses: actions/cache/restore@v5
       with:
         key: ${{ runner.os }}-deps-${{ github.ref }}-${{ github.sha }}
@@ -35,8 +44,10 @@ jobs:
           ${{ runner.os }}-deps-
         path: deps
     - name: Create deps folder
+      if: steps.restore-soh-otr.outputs.cache-hit != 'true'
       run: mkdir -p deps
     - name: Install latest SDL
+      if: steps.restore-soh-otr.outputs.cache-hit != 'true'
       run: |
         export PATH="/usr/lib/ccache:/usr/local/opt/ccache/libexec:$PATH"
         if [ ! -d "deps/SDL2-2.30.3" ]; then
@@ -49,6 +60,7 @@ jobs:
         sudo make install
         sudo cp -av /usr/local/lib/libSDL* /lib/x86_64-linux-gnu/
     - name: Install latest tinyxml2
+      if: steps.restore-soh-otr.outputs.cache-hit != 'true'
       run: |
         sudo apt-get remove libtinyxml2-dev
         export PATH="/usr/lib/ccache:/usr/local/opt/ccache/libexec:$PATH"
@@ -63,10 +75,17 @@ jobs:
         make
         sudo make install
     - name: Generate soh.o2r
+      if: steps.restore-soh-otr.outputs.cache-hit != 'true'
       run: |
         export PATH="/usr/lib/ccache:/usr/local/opt/ccache/libexec:$PATH"
         cmake --no-warn-unused-cli -H. -Bbuild-cmake -GNinja -DCMAKE_BUILD_TYPE:STRING=Release
         cmake --build build-cmake --config Release --target GenerateSohOtr -j3
+    - name: Save cached soh.o2r
+      if: steps.restore-soh-otr.outputs.cache-hit != 'true'
+      uses: actions/cache/save@v5
+      with:
+        key: ${{ runner.os }}-soh-o2r-9.2.3
+        path: soh.o2r
     - name: Upload soh.o2r
       uses: actions/upload-artifact@v7
       with:
@@ -263,6 +282,71 @@ jobs:
       with:
         key: ${{ steps.restore-cache-deps.outputs.cache-primary-key }}
         path: deps
+
+  build-wiiu:
+    needs: generate-soh-otr
+    runs-on: ubuntu-22.04
+    container:
+      image: devkitpro/devkitppc:20260503
+    steps:
+    - name: Install dependencies
+      run: |
+        apt-get update
+        apt-get install -y ccache ninja-build
+    - name: Git Checkout
+      uses: actions/checkout@v6
+      with:
+        submodules: true
+    - name: Restore Wii U compiler cache
+      id: restore-wiiu-ccache
+      uses: actions/cache/restore@v5
+      with:
+        path: .ccache
+        key: ${{ runner.os }}-wiiu-ccache-${{ github.sha }}
+        restore-keys: |
+          ${{ runner.os }}-wiiu-ccache-
+    - name: Download soh.o2r
+      uses: actions/download-artifact@v7
+      with:
+        name: soh.o2r
+        path: build-wiiu/soh
+    - name: Build SoH for Wii U
+      env:
+        DEVKITPRO: /opt/devkitpro
+        DEVKITPPC: /opt/devkitpro/devkitPPC
+        CCACHE_DIR: ${{ github.workspace }}/.ccache
+        CCACHE_MAXSIZE: 1G
+      run: |
+        git config --global --add safe.directory "$GITHUB_WORKSPACE"
+        cmake -S . -B build-wiiu -G Ninja \
+          -DCMAKE_TOOLCHAIN_FILE=/opt/devkitpro/cmake/WiiU.cmake \
+          -DCMAKE_BUILD_TYPE=Release \
+          -DCMAKE_C_COMPILER_LAUNCHER=ccache \
+          -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
+        cmake --build build-wiiu --target soh_wuhb --parallel 3 -- -k 0
+    - name: Show Wii U compiler cache statistics
+      if: ${{ always() }}
+      env:
+        CCACHE_DIR: ${{ github.workspace }}/.ccache
+      run: ccache --show-stats
+    - name: Save Wii U compiler cache
+      if: ${{ always() }}
+      uses: actions/cache/save@v5
+      with:
+        path: .ccache
+        key: ${{ steps.restore-wiiu-ccache.outputs.cache-primary-key }}
+    - name: Assemble SD-card package
+      run: |
+        mkdir -p dist/soh-9-2-wiiu
+        cp build-wiiu/soh/soh.rpx dist/soh-9-2-wiiu/
+        cp build-wiiu/soh/soh.wuhb dist/soh-9-2-wiiu/
+        cp build-wiiu/soh/soh.o2r dist/soh-9-2-wiiu/
+        cp README_WIIU_TESTING.md dist/
+    - name: Upload Wii U build
+      uses: actions/upload-artifact@v7
+      with:
+        name: soh-wiiu-9.2.3-experimental
+        path: dist
 
   build-windows:
     needs: generate-soh-otr

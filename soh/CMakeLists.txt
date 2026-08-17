@@ -162,7 +162,10 @@ if (NOT ESPEAK)
 endif()
 
 # soh/Extractor {{{
-list(FILTER ship__ EXCLUDE REGEX "soh/Extractor/*")
+# `soh__` is a recursive glob and already contains the extractor sources. Remove
+# them before adding the platform-specific list below; consoles only carry the
+# headers because ROM extraction is a desktop-only feature.
+list(FILTER soh__ EXCLUDE REGEX "^soh/Extractor/")
 
 if(NOT CMAKE_SYSTEM_NAME MATCHES "NintendoSwitch|CafeOS")
     file(GLOB_RECURSE soh__Extractor RELATIVE ${CMAKE_CURRENT_SOURCE_DIR}
@@ -681,12 +684,25 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "NintendoSwitch")
     )
 elseif(CMAKE_SYSTEM_NAME STREQUAL "CafeOS")
     find_package(SDL2 REQUIRED)
+    # Streamed custom audio is compiled on Wii U as well. Use the package
+    # targets so opusfile supplies its non-default include directory and both
+    # decoders carry their static codec/container dependencies to the linker.
+    find_package(Ogg REQUIRED)
+    find_package(Vorbis REQUIRED)
+    find_package(Opus REQUIRED)
+    find_package(OpusFile REQUIRED)
+    find_library(MATH_LIBRARY m)
     set(ADDITIONAL_LIBRARY_DEPENDENCIES
         "libultraship;"
         SDL2::SDL2-static
+        Vorbis::vorbisfile
+        Opusfile::Opusfile
 
         "$<$<CONFIG:Debug>:-Wl,--wrap=abort>"
     )
+    if(MATH_LIBRARY)
+        list(APPEND ADDITIONAL_LIBRARY_DEPENDENCIES ${MATH_LIBRARY})
+    endif()
     target_include_directories(${PROJECT_NAME} PRIVATE
         ${DEVKITPRO}/portlibs/wiiu/include/
     )
@@ -764,8 +780,8 @@ elseif(CMAKE_SYSTEM_NAME MATCHES "CafeOS")
 wut_create_rpx(${PROJECT_NAME})
 
 wut_create_wuhb(${PROJECT_NAME}
-    NAME       "Ship of Harkinian"
-    SHORTNAME  "SoH"
+    NAME       "Ship of Harkinian 9.2.3 (Experimental)"
+    SHORTNAME  "SoH 9.2.3 Wii U"
     AUTHOR     "${PROJECT_TEAM}"
     ICON       ${CMAKE_CURRENT_SOURCE_DIR}/icon.jpg
 )

@@ -20,7 +20,7 @@ void disableBetaQuest();
 #endif
 
 namespace SohGui {
-static std::map<int32_t, const char*> languages = {
+inline std::map<int32_t, const char*> languages = {
     { LANGUAGE_ENG, "English" },
     { LANGUAGE_GER, "German" },
     { LANGUAGE_FRA, "French" },
