@@ -227,8 +227,8 @@ set(ALL_FILES
 # Target
 ################################################################################
 add_executable(${PROJECT_NAME} ${ALL_FILES})
-target_compile_definitions(${PROJECT_NAME} PRIVATE
-    $<$<BOOL:${SOH_WIIU_DEBUG_TELEMETRY}>:SOH_WIIU_DEBUG_TELEMETRY>
+set_source_files_properties(soh/OTRGlobals.cpp PROPERTIES
+    COMPILE_DEFINITIONS "$<$<BOOL:${SOH_WIIU_DEBUG_TELEMETRY}>:SOH_WIIU_DEBUG_TELEMETRY>"
 )
 
 if (CMAKE_SYSTEM_NAME STREQUAL "Windows")
