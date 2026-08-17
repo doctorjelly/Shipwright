@@ -37,9 +37,9 @@ extern std::unordered_map<std::string, ExtensionEntry> ExtensionCache;
 
 #ifdef __WIIU__
 // Keep the experimental 9.2.x port isolated from the stable Wii U release.
-const std::string appShortName = "soh-9-2-wiiu";
+inline const std::string appShortName = "soh-9-2-wiiu";
 #else
-const std::string appShortName = "soh";
+inline const std::string appShortName = "soh";
 #endif
 
 #ifdef __WIIU__

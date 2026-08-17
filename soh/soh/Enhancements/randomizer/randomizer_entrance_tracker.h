@@ -76,10 +76,10 @@ typedef struct {
     uint16_t GroupOffsets[TRACKER_GROUP_TYPE_COUNT][SPOILER_ENTRANCE_GROUP_COUNT];
 } EntranceTrackingData;
 
-static std::map<int32_t, const char*> windowType = { { TRACKER_WINDOW_FLOATING, "Floating" },
-                                                     { TRACKER_WINDOW_WINDOW, "Window" } };
-static std::map<int32_t, const char*> showMode = { { 0, "Always" }, { 1, "Combo Button Hold" } };
-static std::map<int32_t, const char*> buttonStrings = {
+inline const std::map<int32_t, const char*> windowType = { { TRACKER_WINDOW_FLOATING, "Floating" },
+                                                          { TRACKER_WINDOW_WINDOW, "Window" } };
+inline const std::map<int32_t, const char*> showMode = { { 0, "Always" }, { 1, "Combo Button Hold" } };
+inline const std::map<int32_t, const char*> buttonStrings = {
     { TRACKER_COMBO_BUTTON_A, "A Button" },    { TRACKER_COMBO_BUTTON_B, "B Button" },
     { TRACKER_COMBO_BUTTON_C_UP, "C-Up" },     { TRACKER_COMBO_BUTTON_C_DOWN, "C-Down" },
     { TRACKER_COMBO_BUTTON_C_LEFT, "C-Left" }, { TRACKER_COMBO_BUTTON_C_RIGHT, "C-Right" },
@@ -90,8 +90,8 @@ static std::map<int32_t, const char*> buttonStrings = {
 };
 
 static const Color_RGBA8 Color_Bg_Default = { 0, 0, 0, 255 }; // Black
-static std::vector<uint32_t> buttons = { BTN_A, BTN_B, BTN_CUP,   BTN_CDOWN, BTN_CLEFT, BTN_CRIGHT, BTN_L,
-                                         BTN_Z, BTN_R, BTN_START, BTN_DUP,   BTN_DDOWN, BTN_DLEFT,  BTN_DRIGHT };
+inline constexpr uint32_t buttons[] = { BTN_A, BTN_B, BTN_CUP,   BTN_CDOWN, BTN_CLEFT, BTN_CRIGHT, BTN_L,
+                                        BTN_Z, BTN_R, BTN_START, BTN_DUP,   BTN_DDOWN, BTN_DLEFT,  BTN_DRIGHT };
 
 #define SINGLE_SCENE_INFO(scene) \
     {                            \
