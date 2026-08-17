@@ -4,6 +4,7 @@
 #include <atomic>
 #include <filesystem>
 #include <fstream>
+#include <limits>
 #include <vector>
 #include <chrono>
 #include <optional>
@@ -147,6 +148,38 @@ int32_t previousImGuiScaleIndex;
 float previousImGuiScale;
 
 bool prevAltAssets = false;
+
+#ifdef __WIIU__
+namespace {
+using WiiUPerfClock = std::chrono::steady_clock;
+
+struct WiiUPerformanceStats {
+    WiiUPerfClock::time_point previousFrameStart;
+    bool hasPreviousFrame = false;
+    uint32_t sampleCount = 0;
+    uint64_t frameIntervalTotalUs = 0;
+    uint64_t graphTotalUs = 0;
+    uint64_t renderTotalUs = 0;
+    uint64_t audioTotalUs = 0;
+    uint64_t audioWaitTotalUs = 0;
+    uint32_t frameIntervalMaxUs = 0;
+    uint32_t graphMaxUs = 0;
+    uint32_t renderMaxUs = 0;
+    uint32_t audioMaxUs = 0;
+    uint32_t audioWaitMaxUs = 0;
+    int32_t minimumAudioQueued = std::numeric_limits<int32_t>::max();
+};
+
+WiiUPerformanceStats wiiUPerformanceStats;
+std::atomic<uint32_t> wiiULastAudioGenerationUs = 0;
+std::atomic<int32_t> wiiULastAudioQueued = -1;
+std::atomic<uint32_t> wiiUAudioEmptyCount = 0;
+
+uint32_t WiiUDurationUs(WiiUPerfClock::time_point begin, WiiUPerfClock::time_point end) {
+    return static_cast<uint32_t>(std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count());
+}
+} // namespace
+#endif
 
 // Same as NaviColor type from OoT src (z_actor.c), but modified to be sans alpha channel for Controller LED.
 typedef struct {
@@ -1027,6 +1060,9 @@ void OTRAudio_Thread() {
             }
         }
         std::unique_lock<std::mutex> Lock(audio.mutex);
+#ifdef __WIIU__
+        const auto audioGenerationStart = WiiUPerfClock::now();
+#endif
 // AudioMgr_ThreadEntry(&gAudioMgr);
 //  528 and 544 relate to 60 fps at 32 kHz 32000/60 = 533.333..
 //  in an ideal world, one third of the calls should use num_samples=544 and two thirds num_samples=528
@@ -1037,6 +1073,12 @@ void OTRAudio_Thread() {
 #define NUM_AUDIO_CHANNELS 2
 
         int samples_left = AudioPlayer_Buffered();
+#ifdef __WIIU__
+        wiiULastAudioQueued.store(samples_left, std::memory_order_relaxed);
+        if (samples_left <= 0) {
+            wiiUAudioEmptyCount.fetch_add(1, std::memory_order_relaxed);
+        }
+#endif
         u32 num_audio_samples = samples_left < AudioPlayer_GetDesiredBuffered() ? SAMPLES_HIGH : SAMPLES_LOW;
 
         // 3 is the maximum authentic frame divisor.
@@ -1049,6 +1091,10 @@ void OTRAudio_Thread() {
         AudioPlayer_Play((u8*)audio_buffer,
                          num_audio_samples * (sizeof(int16_t) * NUM_AUDIO_CHANNELS * AUDIO_FRAMES_PER_UPDATE));
 
+#ifdef __WIIU__
+        wiiULastAudioGenerationUs.store(WiiUDurationUs(audioGenerationStart, WiiUPerfClock::now()),
+                                        std::memory_order_relaxed);
+#endif
         audio.processing = false;
         audio.cv_from_thread.notify_one();
     }
@@ -1747,6 +1793,16 @@ void RunCommands(Gfx* Commands, const std::vector<std::unordered_map<Mtx*, MtxF>
 
 // C->C++ Bridge
 extern "C" void Graph_ProcessGfxCommands(Gfx* commands) {
+#ifdef __WIIU__
+    const auto frameStart = WiiUPerfClock::now();
+    uint32_t frameIntervalUs = 0;
+    const bool hasFrameInterval = wiiUPerformanceStats.hasPreviousFrame;
+    if (hasFrameInterval) {
+        frameIntervalUs = WiiUDurationUs(wiiUPerformanceStats.previousFrameStart, frameStart);
+    }
+    wiiUPerformanceStats.previousFrameStart = frameStart;
+    wiiUPerformanceStats.hasPreviousFrame = true;
+#endif
     {
         std::unique_lock<std::mutex> Lock(audio.mutex);
         audio.processing = true;
@@ -1794,7 +1850,14 @@ extern "C" void Graph_ProcessGfxCommands(Gfx* commands) {
         mtx_replacements.emplace_back();
     }
 
+#ifdef __WIIU__
+    const auto renderStart = WiiUPerfClock::now();
+#endif
     RunCommands(commands, mtx_replacements);
+#ifdef __WIIU__
+    const auto renderEnd = WiiUPerfClock::now();
+    const auto audioWaitStart = renderEnd;
+#endif
 
     last_fps = fps;
     last_update_rate = R_UPDATE_RATE;
@@ -1805,6 +1868,51 @@ extern "C" void Graph_ProcessGfxCommands(Gfx* commands) {
             audio.cv_from_thread.wait(Lock);
         }
     }
+
+#ifdef __WIIU__
+    const auto frameEnd = WiiUPerfClock::now();
+    if (hasFrameInterval) {
+        auto& stats = wiiUPerformanceStats;
+        const uint32_t graphUs = WiiUDurationUs(frameStart, frameEnd);
+        const uint32_t renderUs = WiiUDurationUs(renderStart, renderEnd);
+        const uint32_t audioUs = wiiULastAudioGenerationUs.load(std::memory_order_relaxed);
+        const uint32_t audioWaitUs = WiiUDurationUs(audioWaitStart, frameEnd);
+        const int32_t audioQueued = wiiULastAudioQueued.load(std::memory_order_relaxed);
+
+        stats.sampleCount++;
+        stats.frameIntervalTotalUs += frameIntervalUs;
+        stats.graphTotalUs += graphUs;
+        stats.renderTotalUs += renderUs;
+        stats.audioTotalUs += audioUs;
+        stats.audioWaitTotalUs += audioWaitUs;
+        stats.frameIntervalMaxUs = std::max(stats.frameIntervalMaxUs, frameIntervalUs);
+        stats.graphMaxUs = std::max(stats.graphMaxUs, graphUs);
+        stats.renderMaxUs = std::max(stats.renderMaxUs, renderUs);
+        stats.audioMaxUs = std::max(stats.audioMaxUs, audioUs);
+        stats.audioWaitMaxUs = std::max(stats.audioWaitMaxUs, audioWaitUs);
+        if (audioQueued >= 0) {
+            stats.minimumAudioQueued = std::min(stats.minimumAudioQueued, audioQueued);
+        }
+
+        if (stats.sampleCount == 60) {
+            const int32_t actualFps = wnd != nullptr ? wnd->GetTargetFps() : -1;
+            const int32_t minimumAudioQueued =
+                stats.minimumAudioQueued == std::numeric_limits<int32_t>::max() ? -1 : stats.minimumAudioQueued;
+            OSReport("[SoH][perf] interval_us=%u/%u graph_us=%u/%u render_us=%u/%u audio_us=%u/%u "
+                     "audio_wait_us=%u/%u queue=%d/%d/%d empty=%u fps=%d/%d update=%d\n",
+                     static_cast<uint32_t>(stats.frameIntervalTotalUs / stats.sampleCount), stats.frameIntervalMaxUs,
+                     static_cast<uint32_t>(stats.graphTotalUs / stats.sampleCount), stats.graphMaxUs,
+                     static_cast<uint32_t>(stats.renderTotalUs / stats.sampleCount), stats.renderMaxUs,
+                     static_cast<uint32_t>(stats.audioTotalUs / stats.sampleCount), stats.audioMaxUs,
+                     static_cast<uint32_t>(stats.audioWaitTotalUs / stats.sampleCount), stats.audioWaitMaxUs,
+                     minimumAudioQueued, audioQueued, AudioPlayer_GetDesiredBuffered(),
+                     wiiUAudioEmptyCount.load(std::memory_order_relaxed), fps, actualFps, R_UPDATE_RATE);
+            stats = {};
+            stats.previousFrameStart = frameStart;
+            stats.hasPreviousFrame = true;
+        }
+    }
+#endif
 
     bool curAltAssets = CVarGetInteger(CVAR_SETTING("AltAssets"), 1);
     if (prevAltAssets != curAltAssets) {
