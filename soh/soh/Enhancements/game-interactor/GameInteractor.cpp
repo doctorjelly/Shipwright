@@ -33,6 +33,14 @@ GameInteractionEffectQueryResult GameInteractor::RemoveEffect(RemovableGameInter
     return effect.Remove();
 }
 
+void GameInteractor::RemoveAllQueuedHooks() {
+#define DEFINE_HOOK(name, _) ProcessUnregisteredHooks<name>();
+
+#include "GameInteractor_HookTable.h"
+
+#undef DEFINE_HOOK
+}
+
 // MARK: - Helpers
 
 bool GameInteractor::IsSaveLoaded(bool allowDbgSave) {
