@@ -25,7 +25,7 @@ typedef struct {
 
 // Reference https://tcrf.net/Proto:The_Legend_of_Zelda:_Ocarina_of_Time_Master_Quest/Event_Editor
 // The source was last referenced on 2022-09-03 and had a last updated value of 2020-05-02
-const std::vector<FlagTable> flagTables = {
+inline const std::vector<FlagTable> flagTables = {
     { "Event Check Inf Flags",
       EVENT_CHECK_INF,
       0x0D,
@@ -370,7 +370,7 @@ const std::vector<FlagTable> flagTables = {
       } },
 };
 
-const std::vector<std::string> state1 = {
+inline const std::vector<std::string> state1 = {
     "Loading",
     "Swinging Bottle",
     "Falling from Hookshot",
@@ -405,7 +405,7 @@ const std::vector<std::string> state1 = {
     "Floor collision disabled",
 };
 
-const std::vector<std::string> state2 = {
+inline const std::vector<std::string> state2 = {
     "Grab",
     "Speak/Check",
     "Climb",
@@ -440,7 +440,7 @@ const std::vector<std::string> state2 = {
     "Void out",
 };
 
-const std::vector<std::string> state3 = {
+inline const std::vector<std::string> state3 = {
     "Ignore ceiling for Floor and Water",
     "Midair",
     "Pause Action Func",

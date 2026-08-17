@@ -73,7 +73,7 @@ enum Colors {
 
 enum InputTypes { String, Scalar };
 
-const std::unordered_map<Colors, ImVec4> ColorValues = {
+inline const std::unordered_map<Colors, ImVec4> ColorValues = {
     { Colors::Pink, ImVec4(0.87f, 0.3f, 0.87f, 1.0f) },     { Colors::Red, ImVec4(0.55f, 0.0f, 0.0f, 1.0f) },
     { Colors::DarkRed, ImVec4(0.3f, 0.0f, 0.0f, 1.0f) },    { Colors::Orange, ImVec4(0.85f, 0.55f, 0.0f, 1.0f) },
     { Colors::Yellow, ImVec4(0.95f, 0.95f, 0.0f, 1.0f) },   { Colors::Green, ImVec4(0.0f, 0.55f, 0.0f, 1.0f) },
