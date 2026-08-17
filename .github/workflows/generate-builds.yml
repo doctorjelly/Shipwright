@@ -5,7 +5,7 @@ on:
   workflow_dispatch:
     inputs:
       wiiu_debug_telemetry:
-        description: Emit telemetry through Aroma TCP syslog (also enabled by a wiiu-debug/* branch)
+        description: Emit telemetry through Aroma TCP syslog (also enabled by [wiiu-debug] in a push commit)
         required: false
         default: false
         type: boolean
@@ -309,9 +309,9 @@ jobs:
       uses: actions/cache/restore@v5
       with:
         path: .ccache
-        key: ${{ runner.os }}-wiiu-ccache-${{ (inputs.wiiu_debug_telemetry || startsWith(github.ref_name, 'wiiu-debug/')) && 'debug' || 'normal' }}-${{ github.sha }}
+        key: ${{ runner.os }}-wiiu-ccache-${{ (inputs.wiiu_debug_telemetry || contains(github.event.head_commit.message, '[wiiu-debug]')) && 'debug' || 'normal' }}-${{ github.sha }}
         restore-keys: |
-          ${{ runner.os }}-wiiu-ccache-${{ (inputs.wiiu_debug_telemetry || startsWith(github.ref_name, 'wiiu-debug/')) && 'debug' || 'normal' }}-
+          ${{ runner.os }}-wiiu-ccache-${{ (inputs.wiiu_debug_telemetry || contains(github.event.head_commit.message, '[wiiu-debug]')) && 'debug' || 'normal' }}-
           ${{ runner.os }}-wiiu-ccache-
     - name: Download soh.o2r
       uses: actions/download-artifact@v7
@@ -329,7 +329,7 @@ jobs:
         cmake -S . -B build-wiiu -G Ninja \
           -DCMAKE_TOOLCHAIN_FILE=/opt/devkitpro/cmake/WiiU.cmake \
           -DCMAKE_BUILD_TYPE=Release \
-          -DSOH_WIIU_DEBUG_TELEMETRY=${{ (inputs.wiiu_debug_telemetry || startsWith(github.ref_name, 'wiiu-debug/')) && 'ON' || 'OFF' }} \
+          -DSOH_WIIU_DEBUG_TELEMETRY=${{ (inputs.wiiu_debug_telemetry || contains(github.event.head_commit.message, '[wiiu-debug]')) && 'ON' || 'OFF' }} \
           -DCMAKE_C_COMPILER_LAUNCHER=ccache \
           -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
         cmake --build build-wiiu --target soh_wuhb --parallel 3 -- -k 0
@@ -354,7 +354,7 @@ jobs:
     - name: Upload Wii U build
       uses: actions/upload-artifact@v7
       with:
-        name: soh-wiiu-9.2.3-experimental${{ (inputs.wiiu_debug_telemetry || startsWith(github.ref_name, 'wiiu-debug/')) && '-debug' || '' }}
+        name: soh-wiiu-9.2.3-experimental${{ (inputs.wiiu_debug_telemetry || contains(github.event.head_commit.message, '[wiiu-debug]')) && '-debug' || '' }}
         path: dist
 
   build-windows:
