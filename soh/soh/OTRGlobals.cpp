@@ -74,6 +74,9 @@
 #include "soh/Network/CrowdControl/CrowdControl.h"
 #include "soh/Network/Sail/Sail.h"
 #include "soh/Network/Anchor/Anchor.h"
+#if defined(__WIIU__) && defined(SOH_WIIU_DEBUG_TELEMETRY)
+#include "soh/Network/WiiUTestControl/WiiUTestControl.h"
+#endif
 #include "Enhancements/mods.h"
 #include "Enhancements/game-interactor/GameInteractor.h"
 #include "Enhancements/randomizer/draw.h"
@@ -175,6 +178,7 @@ struct WiiUPerformanceStats {
 WiiUPerformanceStats wiiUPerformanceStats;
 std::atomic<uint32_t> wiiULastAudioGenerationUs = 0;
 std::atomic<int32_t> wiiULastAudioQueued = -1;
+bool wiiUTestControlSdlNetInitialized = false;
 std::atomic<uint32_t> wiiUAudioEmptyCount = 0;
 
 uint32_t WiiUDurationUs(WiiUPerfClock::time_point begin, WiiUPerfClock::time_point end) {
@@ -1586,8 +1590,29 @@ extern "C" void InitOTR(int argc, char* argv[]) {
     }
 
     srand(now);
-#ifdef ENABLE_REMOTE_CONTROL
+#if defined(__WIIU__) && defined(SOH_WIIU_DEBUG_TELEMETRY)
+    wiiUTestControlSdlNetInitialized = SDLNet_Init() >= 0;
+    if (!wiiUTestControlSdlNetInitialized) {
+        OSReport("[SoH][test-control] SDLNet_Init failed: %s\n", SDLNet_GetError());
+    }
+#elif defined(ENABLE_REMOTE_CONTROL)
     SDLNet_Init();
+#endif
+#if defined(__WIIU__) && defined(SOH_WIIU_DEBUG_TELEMETRY)
+    if (wiiUTestControlSdlNetInitialized) {
+        WiiUTestControl::Instance = new WiiUTestControl();
+        if (!WiiUTestControl::Instance->Start()) {
+            delete WiiUTestControl::Instance;
+            WiiUTestControl::Instance = nullptr;
+        }
+    }
+    if (WiiUTestControl::Instance != nullptr) {
+        GameInteractor::Instance->RegisterGameHook<GameInteractor::OnTransitionEnd>([](int16_t) {
+            if (WiiUTestControl::Instance != nullptr) {
+                WiiUTestControl::Instance->NotifyTransitionEnd();
+            }
+        });
+    }
 #endif
     if (CVarGetInteger(CVAR_REMOTE_CROWD_CONTROL("Enabled"), 0)) {
         CrowdControl::Instance->Enable();
@@ -1619,7 +1644,19 @@ extern "C" void DeinitOTR() {
     if (CVarGetInteger(CVAR_REMOTE_ANCHOR("Enabled"), 0)) {
         Anchor::Instance->Disable();
     }
-#ifdef ENABLE_REMOTE_CONTROL
+#if defined(__WIIU__) && defined(SOH_WIIU_DEBUG_TELEMETRY)
+    if (WiiUTestControl::Instance != nullptr) {
+        WiiUTestControl::Instance->Stop();
+        delete WiiUTestControl::Instance;
+        WiiUTestControl::Instance = nullptr;
+    }
+#endif
+#if defined(__WIIU__) && defined(SOH_WIIU_DEBUG_TELEMETRY)
+    if (wiiUTestControlSdlNetInitialized) {
+        SDLNet_Quit();
+        wiiUTestControlSdlNetInitialized = false;
+    }
+#elif defined(ENABLE_REMOTE_CONTROL)
     SDLNet_Quit();
 #endif
 
@@ -1796,6 +1833,9 @@ void RunCommands(Gfx* Commands, const std::vector<std::unordered_map<Mtx*, MtxF>
 // C->C++ Bridge
 extern "C" void Graph_ProcessGfxCommands(Gfx* commands) {
 #if defined(__WIIU__) && defined(SOH_WIIU_DEBUG_TELEMETRY)
+    if (WiiUTestControl::Instance != nullptr) {
+        WiiUTestControl::Instance->Process();
+    }
     const auto frameStart = WiiUPerfClock::now();
     uint32_t frameIntervalUs = 0;
     const bool hasFrameInterval = wiiUPerformanceStats.hasPreviousFrame;

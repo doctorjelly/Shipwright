@@ -5,7 +5,7 @@ on:
   workflow_dispatch:
     inputs:
       wiiu_debug_telemetry:
-        description: Emit telemetry through Aroma TCP syslog (also enabled by [wiiu-debug] in a push commit)
+        description: Enable Wii U telemetry and local test control (also enabled by [wiiu-debug] in a push commit)
         required: false
         default: false
         type: boolean
@@ -351,6 +351,11 @@ jobs:
         cp build-wiiu/soh/soh.wuhb dist/soh-9-2-wiiu/
         cp build-wiiu/soh/soh.o2r dist/soh-9-2-wiiu/
         cp README_WIIU_TESTING.md dist/
+    - name: Add Wii U test-control client
+      if: ${{ inputs.wiiu_debug_telemetry || contains(github.event.head_commit.message, '[wiiu-debug]') }}
+      run: |
+        cp scripts/wiiu/test_control.py dist/
+        cp WIIU_TEST_CONTROL.md dist/
     - name: Upload Wii U build
       uses: actions/upload-artifact@v7
       with:

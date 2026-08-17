@@ -147,6 +147,11 @@ if (!BUILD_REMOTE_CONTROL)
     list(FILTER soh__ EXCLUDE REGEX "soh/Enhancements/crowd-control/")
 endif()
 
+# Do not compile or link the Wii U test-control service into normal artifacts.
+if(NOT SOH_WIIU_DEBUG_TELEMETRY)
+    list(FILTER soh__ EXCLUDE REGEX "^soh/Network/WiiUTestControl/")
+endif()
+
 # handle speechsynthesizer removals
 if (CMAKE_SYSTEM_NAME STREQUAL "Windows")
     list(FILTER soh__ EXCLUDE REGEX "soh/Enhancements/speechsynthesizer/Darwin")
@@ -227,7 +232,10 @@ set(ALL_FILES
 # Target
 ################################################################################
 add_executable(${PROJECT_NAME} ${ALL_FILES})
-set_source_files_properties(soh/OTRGlobals.cpp PROPERTIES
+set_source_files_properties(
+    soh/OTRGlobals.cpp
+    soh/Network/WiiUTestControl/WiiUTestControl.cpp
+    PROPERTIES
     COMPILE_DEFINITIONS "$<$<BOOL:${SOH_WIIU_DEBUG_TELEMETRY}>:SOH_WIIU_DEBUG_TELEMETRY>"
 )
 
@@ -303,12 +311,42 @@ FetchContent_MakeAvailable(dr_libs)
 find_package(SDL2)
 set(SDL2-INCLUDE ${SDL2_INCLUDE_DIRS})
 
-if (BUILD_REMOTE_CONTROL)
-    find_package(SDL2_net)
+# Wii U test control shares SDL2_net with the generic remote-control features,
+# but it does not enable those features or their background networking thread.
+set(SOH_NEEDS_SDL2_NET ${BUILD_REMOTE_CONTROL})
+if(CMAKE_SYSTEM_NAME STREQUAL "CafeOS")
+    set(SOH_NEEDS_SDL2_NET ${SOH_WIIU_DEBUG_TELEMETRY})
+endif()
+
+if (SOH_NEEDS_SDL2_NET)
+    if(CMAKE_SYSTEM_NAME STREQUAL "CafeOS")
+        find_path(SDL2_NET_INCLUDE_DIR
+            NAMES SDL2/SDL_net.h
+            PATHS ${DEVKITPRO}/portlibs/wiiu/include
+            NO_DEFAULT_PATH
+        )
+        find_library(SDL2_NET_LIBRARY
+            NAMES SDL2_net
+            PATHS ${DEVKITPRO}/portlibs/wiiu/lib
+            NO_DEFAULT_PATH
+        )
+        if(SDL2_NET_INCLUDE_DIR AND SDL2_NET_LIBRARY)
+            set(SDL2_net_FOUND TRUE)
+            set(SDL_NET_INCLUDE_DIRS ${SDL2_NET_INCLUDE_DIR})
+        else()
+            set(SDL2_net_FOUND FALSE)
+        endif()
+    else()
+        find_package(SDL2_net)
+    endif()
 
     if(NOT SDL2_net_FOUND)
+        if(CMAKE_SYSTEM_NAME STREQUAL "CafeOS" AND SOH_WIIU_DEBUG_TELEMETRY)
+            message(FATAL_ERROR "SDL2_net is required by SOH_WIIU_DEBUG_TELEMETRY")
+        endif()
         message(STATUS "SDL2_net not found (it's possible the version installed is too old). Disabling BUILD_REMOTE_CONTROL.")
         set(BUILD_REMOTE_CONTROL 0)
+        set(SOH_NEEDS_SDL2_NET OFF)
     else()
         set(SDL2-NET-INCLUDE ${SDL_NET_INCLUDE_DIRS})
     endif()
@@ -695,8 +733,11 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "CafeOS")
     find_package(Opus REQUIRED)
     find_package(OpusFile REQUIRED)
     find_library(MATH_LIBRARY m)
-    set(ADDITIONAL_LIBRARY_DEPENDENCIES
-        "libultraship;"
+    set(ADDITIONAL_LIBRARY_DEPENDENCIES "libultraship;")
+    if(SOH_NEEDS_SDL2_NET)
+        list(APPEND ADDITIONAL_LIBRARY_DEPENDENCIES ${SDL2_NET_LIBRARY})
+    endif()
+    list(APPEND ADDITIONAL_LIBRARY_DEPENDENCIES
         SDL2::SDL2-static
         Vorbis::vorbisfile
         Opusfile::Opusfile
