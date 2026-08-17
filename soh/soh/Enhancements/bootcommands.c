@@ -14,4 +14,9 @@ void BootCommands_Init() {
 #if defined(__SWITCH__) || defined(__WIIU__)
     CVarRegisterInteger(CVAR_IMGUI_CONTROLLER_NAV, 1); // always enable controller nav on switch/wii u
 #endif
+#ifdef __WIIU__
+    if (CVarGetFloat(CVAR_INTERNAL_RESOLUTION, 1.0f) > 1.0f) {
+        CVarSetFloat(CVAR_INTERNAL_RESOLUTION, 1.0f);
+    }
+#endif
 }
