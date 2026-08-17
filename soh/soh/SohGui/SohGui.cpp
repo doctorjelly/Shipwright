@@ -123,6 +123,11 @@ void SetupMenuElements() {
 
 void SetupGuiElements() {
     auto gui = Ship::Context::GetInstance()->GetWindow()->GetGui();
+#ifdef __WIIU__
+    if (!mSohMenu->IsVisible()) {
+        gui->GetGameOverlay()->TextDrawNotification(30.0f, true, "Press - to open the Ship of Harkinian menu");
+    }
+#endif
 
     mConsoleWindow = std::make_shared<SohConsoleWindow>(CVAR_WINDOW("SohConsole"), "Console##SoH", ImVec2(820, 630));
     gui->AddGuiWindow(mConsoleWindow);
@@ -260,10 +265,11 @@ bool DismissPopup(std::string title) {
 void ShowRandomizerSettingsMenu() {
     CVarSetString(CVAR_SETTING("Menu.ActiveHeader"), "Randomizer");
     CVarSetString(CVAR_SETTING("Menu.RandomizerSidebarSection"), "General");
-    mSohMenu->Show();
+    ShowEscMenu();
 }
 
 void ShowEscMenu() {
     mSohMenu->Show();
+    Ship::Context::GetInstance()->GetWindow()->GetGui()->UnblockGamepadNavigation();
 }
 } // namespace SohGui
