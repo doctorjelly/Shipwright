@@ -4,7 +4,9 @@
 #include <atomic>
 #include <filesystem>
 #include <fstream>
+#if defined(__WIIU__) && defined(SOH_WIIU_DEBUG_TELEMETRY)
 #include <limits>
+#endif
 #include <vector>
 #include <chrono>
 #include <optional>
@@ -149,7 +151,7 @@ float previousImGuiScale;
 
 bool prevAltAssets = false;
 
-#ifdef __WIIU__
+#if defined(__WIIU__) && defined(SOH_WIIU_DEBUG_TELEMETRY)
 namespace {
 using WiiUPerfClock = std::chrono::steady_clock;
 
@@ -1060,7 +1062,7 @@ void OTRAudio_Thread() {
             }
         }
         std::unique_lock<std::mutex> Lock(audio.mutex);
-#ifdef __WIIU__
+#if defined(__WIIU__) && defined(SOH_WIIU_DEBUG_TELEMETRY)
         const auto audioGenerationStart = WiiUPerfClock::now();
 #endif
 // AudioMgr_ThreadEntry(&gAudioMgr);
@@ -1073,7 +1075,7 @@ void OTRAudio_Thread() {
 #define NUM_AUDIO_CHANNELS 2
 
         int samples_left = AudioPlayer_Buffered();
-#ifdef __WIIU__
+#if defined(__WIIU__) && defined(SOH_WIIU_DEBUG_TELEMETRY)
         wiiULastAudioQueued.store(samples_left, std::memory_order_relaxed);
         if (samples_left <= 0) {
             wiiUAudioEmptyCount.fetch_add(1, std::memory_order_relaxed);
@@ -1091,7 +1093,7 @@ void OTRAudio_Thread() {
         AudioPlayer_Play((u8*)audio_buffer,
                          num_audio_samples * (sizeof(int16_t) * NUM_AUDIO_CHANNELS * AUDIO_FRAMES_PER_UPDATE));
 
-#ifdef __WIIU__
+#if defined(__WIIU__) && defined(SOH_WIIU_DEBUG_TELEMETRY)
         wiiULastAudioGenerationUs.store(WiiUDurationUs(audioGenerationStart, WiiUPerfClock::now()),
                                         std::memory_order_relaxed);
 #endif
@@ -1793,7 +1795,7 @@ void RunCommands(Gfx* Commands, const std::vector<std::unordered_map<Mtx*, MtxF>
 
 // C->C++ Bridge
 extern "C" void Graph_ProcessGfxCommands(Gfx* commands) {
-#ifdef __WIIU__
+#if defined(__WIIU__) && defined(SOH_WIIU_DEBUG_TELEMETRY)
     const auto frameStart = WiiUPerfClock::now();
     uint32_t frameIntervalUs = 0;
     const bool hasFrameInterval = wiiUPerformanceStats.hasPreviousFrame;
@@ -1850,11 +1852,11 @@ extern "C" void Graph_ProcessGfxCommands(Gfx* commands) {
         mtx_replacements.emplace_back();
     }
 
-#ifdef __WIIU__
+#if defined(__WIIU__) && defined(SOH_WIIU_DEBUG_TELEMETRY)
     const auto renderStart = WiiUPerfClock::now();
 #endif
     RunCommands(commands, mtx_replacements);
-#ifdef __WIIU__
+#if defined(__WIIU__) && defined(SOH_WIIU_DEBUG_TELEMETRY)
     const auto renderEnd = WiiUPerfClock::now();
     const auto audioWaitStart = renderEnd;
 #endif
@@ -1869,7 +1871,7 @@ extern "C" void Graph_ProcessGfxCommands(Gfx* commands) {
         }
     }
 
-#ifdef __WIIU__
+#if defined(__WIIU__) && defined(SOH_WIIU_DEBUG_TELEMETRY)
     const auto frameEnd = WiiUPerfClock::now();
     if (hasFrameInterval) {
         auto& stats = wiiUPerformanceStats;

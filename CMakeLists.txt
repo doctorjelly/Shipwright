@@ -14,6 +14,12 @@ set(SPDLOG_LEVEL_OFF 6)
 set(SPDLOG_MIN_CUTOFF SPDLOG_LEVEL_TRACE CACHE STRING "cutoff at trace")
 
 option(SUPPRESS_WARNINGS "Suppress warnings in LUS and src (decomp)" ON)
+option(SOH_WIIU_DEBUG_TELEMETRY "Emit Wii U input and performance telemetry through OSReport" OFF)
+
+if(SOH_WIIU_DEBUG_TELEMETRY AND NOT CMAKE_SYSTEM_NAME STREQUAL "CafeOS")
+    message(FATAL_ERROR "SOH_WIIU_DEBUG_TELEMETRY is only supported for CafeOS builds")
+endif()
+
 if(SUPPRESS_WARNINGS)
     MESSAGE("Suppressing warnings in LUS and src")
     if(MSVC)
