@@ -1001,8 +1001,6 @@ uint32_t OTRGlobals::GetInterpolationFPS() {
     switch (CVarGetInteger(CVAR_SETTING("InterpolationFPS"), 20)) {
         case 30:
             return 30;
-        case 60:
-            return 60;
         default:
             return 20;
     }

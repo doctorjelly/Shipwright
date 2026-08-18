@@ -53,7 +53,6 @@ static const std::map<int32_t, const char*> textureFilteringMap = {
 static const std::map<int32_t, const char*> wiiUFpsOptions = {
     { 20, "20 FPS (Recommended)" },
     { 30, "30 FPS (Experimental)" },
-    { 60, "60 FPS (Experimental)" },
 };
 #endif
 
@@ -405,8 +404,8 @@ void SohMenu::AddMenuSettings() {
         .CVar(CVAR_SETTING("InterpolationFPS"))
         .RaceDisable(false)
         .Options(ComboboxOptions()
-                     .Tooltip("The Wii U display backend supports 20, 30, and 60 FPS. 20 FPS is the original and "
-                              "safest setting; higher settings use visual interpolation and may reduce performance.")
+                     .Tooltip("The Wii U display backend supports 20 and 30 FPS. 20 FPS is the original and safest "
+                              "setting; 30 FPS uses visual interpolation and may reduce performance.")
                      .ComboMap(wiiUFpsOptions)
                      .DefaultIndex(20));
 #else

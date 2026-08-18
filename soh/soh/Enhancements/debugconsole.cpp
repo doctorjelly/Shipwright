@@ -218,6 +218,9 @@ static bool ResetHandler(std::shared_ptr<Ship::Console> Console, std::vector<std
         ERROR_MESSAGE("gGameState == nullptr");
         return 1;
     }
+    for (u8 playerIdx = SEQ_PLAYER_BGM_MAIN; playerIdx <= SEQ_PLAYER_BGM_SUB; playerIdx++) {
+        Audio_QueueSeqCmd((playerIdx << 24) | NA_BGM_STOP);
+    }
     SET_NEXT_GAMESTATE(gGameState, TitleSetup_Init, GameState);
     gGameState->running = false;
     GameInteractor::Instance->ExecuteHooks<GameInteractor::OnExitGame>(gSaveContext.fileNum);
