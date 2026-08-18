@@ -111,6 +111,10 @@ void SetupMenu() {
     auto gui = Ship::Context::GetInstance()->GetWindow()->GetGui();
     mSohMenu = std::make_shared<SohMenu>(CVAR_WINDOW("Menu"), "Port Menu");
     gui->SetMenu(mSohMenu);
+#ifdef __WIIU__
+    // Do not restore an open full-screen menu from the previous session.
+    mSohMenu->Hide();
+#endif
 
     mModalWindow = std::make_shared<SohModalWindow>(CVAR_WINDOW("ModalWindow"), "Modal Window");
     gui->AddGuiWindow(mModalWindow);
@@ -125,7 +129,8 @@ void SetupGuiElements() {
     auto gui = Ship::Context::GetInstance()->GetWindow()->GetGui();
 #ifdef __WIIU__
     if (!mSohMenu->IsVisible()) {
-        gui->GetGameOverlay()->TextDrawNotification(30.0f, true, "Press - to open the Ship of Harkinian menu");
+        gui->GetGameOverlay()->TextDrawNotification(60.0f, true,
+                                                    "Press - at any time to open the Ship of Harkinian menu");
     }
 #endif
 

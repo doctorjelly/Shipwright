@@ -687,6 +687,15 @@ void Menu::DrawElement() {
                       ImGuiChildFlags_AutoResizeX | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AlwaysAutoResize,
                       ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoScrollbar);
 
+    float controllerHelpHeight = 0.0f;
+#ifdef __WIIU__
+    const float controllerHelpStartY = ImGui::GetCursorPosY();
+    ImGui::PushFont(OTRGlobals::Instance->fontStandard);
+    ImGui::TextDisabled("D-Pad: navigate   Left/Right: change panel or value   A: select   B: back   -: close menu");
+    ImGui::PopFont();
+    controllerHelpHeight = ImGui::GetCursorPosY() - controllerHelpStartY;
+#endif
+
     std::unordered_map<std::string, SidebarEntry>* sidebar;
     float headerHeight = headerSizes.at(0).y + style.FramePadding.y * 2;
     ImVec2 buttonSize = ImGui::CalcTextSize(ICON_FA_TIMES_CIRCLE) + style.FramePadding * 2;
@@ -779,15 +788,17 @@ void Menu::DrawElement() {
     UIWidgets::ButtonOptions options2 = {};
     options2.color = UIWidgets::Colors::Red;
     options2.size = UIWidgets::Sizes::Inline;
+#ifdef __WIIU__
+    options2.tooltip = "Restart game";
+#else
     options2.tooltip = "Reset"
 #ifdef __APPLE__
                        " (Command-R)"
-#elif !defined(__SWITCH__) && !defined(__WIIU__)
+#elif !defined(__SWITCH__)
                        " (Ctrl+R)"
-#else
-                       ""
 #endif
         ;
+#endif
     if (UIWidgets::Button(ICON_FA_UNDO, options2)) {
         std::reinterpret_pointer_cast<Ship::ConsoleWindow>(
             Ship::Context::GetInstance()->GetWindow()->GetGui()->GetGuiWindow("Console"))
@@ -796,7 +807,11 @@ void Menu::DrawElement() {
     ImGui::SameLine();
     UIWidgets::ButtonOptions options = {};
     options.size = UIWidgets::Sizes::Inline;
+#ifdef __WIIU__
+    options.tooltip = "Close Menu (-)";
+#else
     options.tooltip = "Close Menu (Esc)";
+#endif
     if (UIWidgets::Button(ICON_FA_TIMES_CIRCLE, options)) {
         ToggleVisibility();
 
@@ -810,19 +825,23 @@ void Menu::DrawElement() {
         }
     }
 
-    pos.y += headerHeight + style.ItemSpacing.y;
+    pos.y += controllerHelpHeight + headerHeight + style.ItemSpacing.y;
     pos.x = centerX - menuSize.x / 2 + (style.ItemSpacing.x * (menuEntries.size() + 1));
     window->DrawList->AddRectFilled(pos, pos + ImVec2{ menuSize.x, 4 }, ImGui::GetColorU32({ 255, 255, 255, 255 }),
                                     true, style.WindowRounding);
     pos.y += style.ItemSpacing.y;
-    float sectionHeight = menuSize.y - headerHeight - 4 - style.ItemSpacing.y * 2;
+    float sectionHeight = menuSize.y - controllerHelpHeight - headerHeight - 4 - style.ItemSpacing.y * 2;
     float columnHeight = sectionHeight - style.ItemSpacing.y * 4;
     ImGui::SetNextWindowPos(pos + style.ItemSpacing * 2);
 
     // Increase sidebar width on larger screens to accomodate people scaling their menus.
     float sidebarWidth = 200 - style.ItemSpacing.x;
     if (menuSize.x > 1600) {
+#ifdef __WIIU__
+        sidebarWidth = menuSize.x * 0.18f;
+#else
         sidebarWidth = menuSize.x * 0.15f;
+#endif
     }
 
     const char* sidebarCvar = menuEntries.at(headerIndex).sidebarCvar;
