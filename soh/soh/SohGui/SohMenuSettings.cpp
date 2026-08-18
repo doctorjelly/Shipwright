@@ -49,6 +49,14 @@ static const std::map<int32_t, const char*> textureFilteringMap = {
     { Fast::FILTER_NONE, "None" },
 };
 
+#ifdef __WIIU__
+static const std::map<int32_t, const char*> wiiUFpsOptions = {
+    { 20, "20 FPS (Recommended)" },
+    { 30, "30 FPS (Experimental)" },
+    { 60, "60 FPS (Experimental)" },
+};
+#endif
+
 static const std::map<int32_t, const char*> notificationPosition = {
     { 0, "Top Left" }, { 1, "Top Right" }, { 2, "Bottom Left" }, { 3, "Bottom Right" }, { 4, "Hidden" },
 };
@@ -258,7 +266,7 @@ void SohMenu::AddMenuSettings() {
         .Options(ComboboxOptions()
                      .ComboMap(imguiScaleOptions)
                      .Tooltip("Changes the scaling of the ImGui menu elements.")
-                     .DefaultIndex(1)
+                     .DefaultIndex(defaultImGuiScale)
                      .ComponentAlignment(ComponentAlignments::Right)
                      .LabelPosition(LabelPositions::Far))
         .Callback([](WidgetInfo& info) { OTRGlobals::Instance->ScaleImGui(); });
@@ -321,22 +329,24 @@ void SohMenu::AddMenuSettings() {
     AddWidget(path, "Audio API (Needs reload)", WIDGET_AUDIO_BACKEND).RaceDisable(false);
 
     // Graphics Settings
-    static int32_t maxFps = 360;
 #ifdef __WIIU__
     static constexpr float maxInternalResolution = 1.0f;
 #else
+    static int32_t maxFps = 360;
     static constexpr float maxInternalResolution = 2.0f;
-#endif
     const char* tooltip = "Uses Matrix Interpolation to create extra frames, resulting in smoother graphics. This is "
                           "purely visual and does not impact game logic, execution of glitches etc.\n\nA higher target "
                           "FPS than your monitor's refresh rate will waste resources, and might give a worse result.";
+#endif
     path.sidebarName = "Graphics";
     AddSidebarEntry("Settings", "Graphics", 3);
     AddWidget(path, "Graphics Options", WIDGET_SEPARATOR_TEXT);
+#ifndef __WIIU__
     AddWidget(path, "Toggle Fullscreen", WIDGET_BUTTON)
         .RaceDisable(false)
         .Callback([](WidgetInfo& info) { Ship::Context::GetInstance()->GetWindow()->ToggleFullscreen(); })
         .Options(ButtonOptions().Tooltip("Toggles Fullscreen On/Off."));
+#endif
     AddWidget(path, "Internal Resolution", WIDGET_CVAR_SLIDER_FLOAT)
         .CVar(CVAR_INTERNAL_RESOLUTION)
         .RaceDisable(false)
@@ -377,6 +387,29 @@ void SohMenu::AddMenuSettings() {
                 .Max(8)
                 .DefaultValue(1));
 #endif
+#ifdef __WIIU__
+    const int32_t configuredFps = CVarGetInteger(CVAR_SETTING("InterpolationFPS"), 20);
+    bool saveWiiUSettings = false;
+    if (!wiiUFpsOptions.contains(configuredFps)) {
+        CVarSetInteger(CVAR_SETTING("InterpolationFPS"), 20);
+        saveWiiUSettings = true;
+    }
+    if (CVarGetInteger(CVAR_SETTING("MatchRefreshRate"), 0)) {
+        CVarClear(CVAR_SETTING("MatchRefreshRate"));
+        saveWiiUSettings = true;
+    }
+    if (saveWiiUSettings) {
+        Ship::Context::GetInstance()->GetWindow()->GetGui()->SaveConsoleVariablesNextFrame();
+    }
+    AddWidget(path, "Current FPS", WIDGET_CVAR_COMBOBOX)
+        .CVar(CVAR_SETTING("InterpolationFPS"))
+        .RaceDisable(false)
+        .Options(ComboboxOptions()
+                     .Tooltip("The Wii U display backend supports 20, 30, and 60 FPS. 20 FPS is the original and "
+                              "safest setting; higher settings use visual interpolation and may reduce performance.")
+                     .ComboMap(wiiUFpsOptions)
+                     .DefaultIndex(20));
+#else
     auto fps = CVarGetInteger(CVAR_SETTING("InterpolationFPS"), 20);
     const char* fpsFormat = fps == 20 ? "Original (%d)" : "%d";
     AddWidget(path, "Current FPS", WIDGET_CVAR_SLIDER_INT)
@@ -400,6 +433,7 @@ void SohMenu::AddMenuSettings() {
         .CVar(CVAR_SETTING("MatchRefreshRate"))
         .RaceDisable(false)
         .Options(CheckboxOptions().Tooltip("Matches interpolation value to the refresh rate of your display."));
+#endif
     AddWidget(path, "Renderer API (Needs reload)", WIDGET_VIDEO_BACKEND).RaceDisable(false);
     AddWidget(path, "Enable Vsync", WIDGET_CVAR_CHECKBOX)
         .CVar(CVAR_VSYNC_ENABLED)

@@ -997,6 +997,16 @@ bool OTRGlobals::HasOriginal() {
 }
 
 uint32_t OTRGlobals::GetInterpolationFPS() {
+#ifdef __WIIU__
+    switch (CVarGetInteger(CVAR_SETTING("InterpolationFPS"), 20)) {
+        case 30:
+            return 30;
+        case 60:
+            return 60;
+        default:
+            return 20;
+    }
+#else
     if (CVarGetInteger(CVAR_SETTING("MatchRefreshRate"), 0)) {
         return Ship::Context::GetInstance()->GetWindow()->GetCurrentRefreshRate();
     } else if (CVarGetInteger(CVAR_VSYNC_ENABLED, 1) ||
@@ -1005,6 +1015,7 @@ uint32_t OTRGlobals::GetInterpolationFPS() {
                                   CVarGetInteger(CVAR_SETTING("InterpolationFPS"), 20));
     }
     return CVarGetInteger(CVAR_SETTING("InterpolationFPS"), 20);
+#endif
 }
 
 extern "C" void OTRMessage_Init();
