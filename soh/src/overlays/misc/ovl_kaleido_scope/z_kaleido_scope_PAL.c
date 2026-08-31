@@ -3881,7 +3881,15 @@ void KaleidoScope_Update(PlayState* play) {
 
             pauseCtx->playerSegment = (void*)(((uintptr_t)play->objectCtx.spaceStart + 0x30) & ~0x3F);
 
+#ifdef __WIIU__
+            // The CaféOS port has no ROM DMA; func_80091738 therefore only
+            // writes a temporary Link skeleton into the object arena.  The
+            // pause preview is disabled on Wii U, so this work is unused and
+            // can overrun the scratch area before the menu becomes active.
+            size1 = 0;
+#else
             size1 = func_80091738(play, pauseCtx->playerSegment, &pauseCtx->playerSkelAnime);
+#endif
             osSyncPrintf("プレイヤー size1＝%x\n", size1);
 
             pauseCtx->iconItemSegment = (void*)(((uintptr_t)pauseCtx->playerSegment + size1 + 0xF) & ~0xF);
