@@ -127,6 +127,12 @@ void KaleidoScope_DrawAButton(PlayState* play, Vtx* vtx, int16_t xTranslate, int
 }
 
 void KaleidoScope_DrawPlayerWork(PlayState* play) {
+#ifdef __WIIU__
+    // The GX2 port cannot safely return from this nested render target yet.
+    // The preview is cosmetic; skipping it keeps the entire pause menu usable.
+    (void)play;
+    return;
+#else
     PauseContext* pauseCtx = &play->pauseCtx;
     Vec3f pos;
     Vec3s rot;
@@ -164,6 +170,7 @@ void KaleidoScope_DrawPlayerWork(PlayState* play) {
 
     gsSPResetFB(WORK_DISP++);
     CLOSE_DISPS(play->state.gfxCtx);
+#endif
 }
 
 void KaleidoScope_DrawEquipment(PlayState* play) {

@@ -12,6 +12,13 @@ extern void KaleidoScope_Update(PlayState* play);
 extern void KaleidoScope_Draw(PlayState* play);
 
 void KaleidoScopeCall_LoadPlayer() {
+#ifdef __WIIU__
+    // Both kaleido overlays are linked into the Wii U executable. Swapping
+    // their legacy N64 overlay bookkeeping from PlayerCall_Update caused the
+    // pause overlay to be cleared and reloaded every frame while paused.
+    // PlayerCall uses direct function pointers here, so no reload is needed.
+    return;
+#else
     KaleidoMgrOverlay* playerActorOvl = &gKaleidoMgrOverlayTable[KALEIDO_OVL_PLAYER_ACTOR];
 
     if (gKaleidoMgrCurOvl != playerActorOvl) {
@@ -29,6 +36,7 @@ void KaleidoScopeCall_LoadPlayer() {
 
         KaleidoManager_LoadOvl(playerActorOvl);
     }
+#endif
 }
 
 void KaleidoScopeCall_Init(PlayState* play) {

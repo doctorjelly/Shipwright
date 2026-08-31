@@ -1478,6 +1478,12 @@ void Play_Draw(PlayState* play) {
         PreRender_SetValues(&play->pauseBgPreRender, SCREEN_WIDTH, SCREEN_HEIGHT, gfxCtx->curFrameBuffer, gZBuffer);
 
         if (R_PAUSE_MENU_MODE == 2) {
+#ifdef __WIIU__
+            // CaféOS does not run the original retrace task that this wait
+            // synchronizes with. Waiting here blocks the game as soon as the
+            // pause menu opens.
+            R_PAUSE_MENU_MODE = 3;
+#else
             // Wait for the previous frame's display list to be processed,
             // so that `pauseBgPreRender.fbufSave` and `pauseBgPreRender.cvgSave` are filled with the appropriate
             // content and can be used by `PreRender_ApplyFilters` below.
@@ -1486,17 +1492,20 @@ void Play_Draw(PlayState* play) {
             PreRender_Calc(&play->pauseBgPreRender);
 
             R_PAUSE_MENU_MODE = 3;
+#endif
         } else if (R_PAUSE_MENU_MODE >= 4) {
             R_PAUSE_MENU_MODE = 0;
         }
 
         if (R_PAUSE_MENU_MODE == 3) {
+#ifndef __WIIU__
             Gfx* gfxP = POLY_OPA_DISP;
 
             // SOH [Port] Draw game framebuffer using our custom handling
             // func_800C24BC(&play->pauseBgPreRender, &gfxP);
             FB_DrawFromFramebuffer(&gfxP, gPauseFrameBuffer, 255);
             POLY_OPA_DISP = gfxP;
+#endif
 
             goto Play_Draw_DrawOverlayElements;
         }
@@ -1619,6 +1628,13 @@ void Play_Draw(PlayState* play) {
             // SOH [Port] Use our custom copy method instead of the prerender system
             // func_800C1F20(&play->pauseBgPreRender, &gfxP);
             if (R_PAUSE_MENU_MODE == 1) {
+#ifdef __WIIU__
+                // The GX2 backend has no safe in-frame copy/readback path for
+                // the pause background. Keep the pause UI functional with its
+                // normal overlay, rather than attempting the capture.
+                R_PAUSE_MENU_MODE = 3;
+                hasCapturedPauseBuffer = true;
+#else
                 play->pauseBgPreRender.cvgSave = (u8*)gfxCtx->curFrameBuffer;
                 // func_800C20B4(&play->pauseBgPreRender, &gfxP);
                 R_PAUSE_MENU_MODE = 2;
@@ -1636,6 +1652,7 @@ void Play_Draw(PlayState* play) {
                     R_PAUSE_MENU_MODE = 3;
                 }
                 // #endregion
+#endif
             } else {
                 gTrnsnUnkState = 2;
             }
