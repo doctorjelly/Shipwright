@@ -1,3 +1,12 @@
+// AudioCmd is defined through global.h.  Its byte fields must use the target
+// layout while that header is parsed, otherwise command bytes are reversed on
+// the Wii U's big-endian PowerPC CPU and the mixer receives invalid commands.
+#if (defined(__BYTE_ORDER__) && (__BYTE_ORDER__ == __ORDER_BIG_ENDIAN__)) || defined(__BIG_ENDIAN__)
+#ifndef IS_BIGENDIAN
+#define IS_BIGENDIAN
+#endif
+#endif
+
 #include "global.h"
 
 #define SAMPLES_TO_OVERPRODUCE 0x10
